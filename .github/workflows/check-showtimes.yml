@@ -1,0 +1,38 @@
+name: Check Showtimes
+
+on:
+  schedule:
+    - cron: "0 * * * *"   # Every hour on the hour (UTC)
+  workflow_dispatch:
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    env:
+      SHOWTIMES_URL: ${{ vars.SHOWTIMES_URL }}
+      NTFY_TOPIC: ${{ vars.NTFY_TOPIC }}
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      
+      - name: Set up Go
+        uses: actions/setup-go@v5
+        with:
+          go-version: '1.24.4'
+
+      - name: Restore cached state
+        id: cache
+        uses: actions/cache@v4
+        with:
+          path: state.json
+          key: showtimes-state
+
+      - name: Run script
+        run: go run main.go
+
+      - name: Save updated state to cache
+        uses: actions/cache/save@v4
+        with:
+          path: state.json
+          key: showtimes-state
