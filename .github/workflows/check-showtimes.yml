@@ -22,17 +22,19 @@ jobs:
           go-version: '1.24.4'
 
       - name: Restore cached state
-        id: cache
+        id: cache-json
         uses: actions/cache@v4
         with:
           path: state.json
-          key: showtimes-state
+          key: showtimes-state-main
+          restore-keys: |
+            showtimes-state-
 
       - name: Run script
         run: go run main.go
 
-      - name: Save updated state to cache
+      - name: Save updated JSON state
         uses: actions/cache/save@v4
         with:
           path: state.json
-          key: showtimes-state
+          key: showtimes-state-${{ github.run_id }}
