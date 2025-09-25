@@ -1,8 +1,8 @@
 name: Check Showtimes
 
 on:
-  # schedule:
-  #   - cron: "0 * * * *"   # Every hour on the hour (UTC)
+  schedule:
+    - cron: "0 * * * *"   # Every hour on the hour (UTC)
   push:
     branches:
       - main
