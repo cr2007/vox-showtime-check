@@ -64,7 +64,7 @@ func SendNotification(topic, msg string, headers map[string]string) {
 		return
 	}
 
-	url := "https://ntfy.sh/" + topic
+	url := fmt.Sprintf("https://ntfy.sh/%s", topic)
 	req, err := http.NewRequest("POST", url, strings.NewReader(msg))
 	if err != nil {
 		fmt.Println("Error creating request:", err)
