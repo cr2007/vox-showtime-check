@@ -1,6 +1,6 @@
 {
 	"name": "Vox Showtime Check Dev Container",
-	"image": "mcr.microsoft.com/devcontainers/go:1.24",
+	"image": "mcr.microsoft.com/devcontainers/go:1.25",
 	"customizations": {
 		"vscode": {
 			"extensions": [
