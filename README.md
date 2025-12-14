@@ -18,6 +18,9 @@ A simple Go tool to monitor a VOX Cinema showtimes webpage and send notification
 ```sh
 git clone https://github.com/<your-username>/vox-showtime-check.git
 cd vox-showtime-check
+
+# Makes a copy of the '.env' file
+cp .env.example .env
 ```
 
 ### 3. Configure Environment Variables
