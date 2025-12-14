@@ -1,11 +1,13 @@
 # Vox Showtime Check
 
-A simple Go tool to monitor a VOX Cinema showtimes webpage and send notifications via [ntfy.sh](https://ntfy.sh/) when showtimes become available or to provide periodic updates if not.
+[![Open in GitHub Codespaces](https://github.com/codespaces/badge.svg)](https://codespaces.new/cr2007/vox-showtime-check)
+
+A simple Go tool to monitor a VOX Cinema showtimes webpage and send notifications via [ntfy.sh](https://ntfy.sh/) when showtimes become available.
 
 # Features
 - Checks a configured URL for showtime listings
-- Sends notifications to an ntfy.sh topic when showtimes appear or at regular intervals if not found.
-- Persists state to avoid duplicate notifications.
+- Sends notifications to an ntfy.sh topic when showtimes appear or at intervals if not found.
+- Persists state to avoid multiple notifications.
 - Designed for scheduled/automated use (e.g., via GitHub Actions).
 
 # Setup
