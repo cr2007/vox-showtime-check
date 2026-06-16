@@ -69,10 +69,10 @@ Set the following repository variables in your GitHub repo settings:
 <!-- ## How It Works
 VOX's movie pages (e.g. `https://uae.voxcinemas.com/movies/<movie>`) are rendered client-side: the showtimes block is populated by JavaScript *after* the page loads, so a plain HTML fetch never contains it. Instead, this tool calls the same internal API the site's own frontend calls, in four steps:
 
-1. **Discover the frontend's `x-api-key`** — rather than hardcoding it, the tool reads it straight out of VOX's own JavaScript, the same way a browser does: it scans the page's referenced `_next/static/chunks/*.js` files for the `apiKey:"..."` literal embedded in one of them. This key isn't a secret (every visitor's browser receives the same value), but VOX rotates the chunk's content hash — and potentially the key — on every deploy, so hardcoding it would silently go stale. The chunk that worked last time is cached in `state.json` and tried first; a full rescan only happens on a cache miss (e.g. after a VOX deploy).
-2. **Get a guest auth token** — `GET https://<region>-apife.voxcinemas.com/groups/authToken` (no credentials needed; this is what any anonymous browser receives).
-3. **Resolve the movie slug to its internal code** — `GET .../v1/vox2-0/groups/Movies/<slug>`, which returns whether the movie is `Bookable` and its `HoCode`.
-4. **Fetch today's sessions** — `GET .../v1/vox2-0/groups/api/Sessions/<REGION>/<HoCode>/<YYYY-MM-DD>`, returning every cinema and session for that date.
+1. **Discover the frontend's `x-api-key`**: instead of hardcoding it, the tool reads it straight out of VOX's own JavaScript, the same way a browser does, by scanning the page's referenced `_next/static/chunks/*.js` files for the `apiKey:"..."` literal embedded in one of them. This key isn't a secret (every visitor's browser receives the same value), but VOX changes the chunk's content hash, and potentially the key, on every deploy, so hardcoding it would silently go stale. The chunk that worked last time is cached in `state.json` and tried first; a full rescan only happens on a cache miss (e.g. after a VOX deploy).
+2. **Get a guest auth token**: `GET https://<region>-apife.voxcinemas.com/groups/authToken` (no credentials needed; this is what any anonymous browser receives).
+3. **Resolve the movie slug to its internal code**: `GET .../v1/vox2-0/groups/Movies/<slug>`, which returns whether the movie is `Bookable` and its `HoCode`.
+4. **Fetch today's sessions**: `GET .../v1/vox2-0/groups/api/Sessions/<REGION>/<HoCode>/<YYYY-MM-DD>`, returning every cinema and session for that date.
 
 The `<region>` (e.g. `uae`) and `<slug>` (e.g. `obsession`) are both parsed out of `SHOWTIMES_URL`, so no extra configuration is needed. -->
 
@@ -85,7 +85,7 @@ Each run:
 
 ## Customization
 - Adjust the notification interval by changing `NotFoundInterval` in `showtimes/showtimes.go`.
-- Modify the notification message or ntfy.sh headers in the same file.
+- Modify the notification message in `showtimes/showtimes.go`, or the ntfy.sh delivery logic in `showtimes/ntfy.go`.
 
 # Contributing
 
