@@ -45,3 +45,19 @@ jobs:
         with:
           path: state.json
           key: showtimes-state-${{ github.run_id }}
+
+      # Send one alert for each break: only when the previous completed run
+      # passed. The current run is still in progress, so the list skips it.
+      - name: Alert on failure
+        if: failure()
+        env:
+          GH_TOKEN: ${{ github.token }}
+          RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+        run: |
+          previous=$(gh run list --repo "$GITHUB_REPOSITORY" --workflow check-showtimes.yml \
+            --status completed --limit 1 --json conclusion --jq '.[0].conclusion')
+          if [ "$previous" = "success" ]; then
+            curl -fsS -H "Title: Showtime check failed" -H "Priority: 4" -H "Tags: warning" \
+              -H "Click: $RUN_URL" -d "The showtime check failed. Open the run log: $RUN_URL" \
+              "https://ntfy.sh/$NTFY_TOPIC"
+          fi
