@@ -6,42 +6,45 @@ import (
 	"time"
 )
 
-// State tracks whether showtimes were last seen and when the last "not found"
-// notification was sent.
-type State struct {
-	Status         string    `json:"status"` // "found" or "not-found"
-	LastNotFoundTs time.Time `json:"last_not_found_ts"`
-}
-
+// stateFile is the file that keeps the State between runs.
 const stateFile = "state.json"
 
-// epoch is a "long ago" default so a fresh state is always overdue for a
-// "not found" notification.
-var epoch = time.Date(1970, 1, 1, 0, 0, 0, 0, time.UTC)
+// Values of State.Status.
+const (
+	statusFound    = "found"
+	statusNotFound = "not-found"
+)
 
-// LoadState reads state.json, or returns a fresh "not-found" state if it
-// doesn't exist or can't be parsed.
-func LoadState() State {
-	state := State{Status: "not-found", LastNotFoundTs: epoch}
+// State is the result of the last run.
+type State struct {
+	// Status is statusFound or statusNotFound.
+	Status string `json:"status"`
+
+	// LastNotFoundTs is the time of the last "not found" notification. The
+	// zero value means "never", so the next "not found" check notifies.
+	LastNotFoundTs time.Time `json:"last_not_found_ts,omitzero"`
+}
+
+// loadState reads the State from stateFile. A missing or invalid file gives
+// a fresh "not found" State, so a lost cache causes at most one extra
+// notification.
+func loadState() State {
+	var state State
 
 	data, err := os.ReadFile(stateFile)
-	if err != nil {
-		return state
-	}
-
-	json.Unmarshal(data, &state)
-
-	// A state.json missing this field (e.g. hand-edited, or from an older
-	// version) would otherwise leave it at Go's zero time.
-	if state.LastNotFoundTs.IsZero() {
-		state.LastNotFoundTs = epoch
+	if err != nil || json.Unmarshal(data, &state) != nil {
+		return State{Status: statusNotFound}
 	}
 
 	return state
 }
 
-// SaveState writes state as formatted JSON to state.json.
-func SaveState(state State) {
-	data, _ := json.MarshalIndent(state, "", "  ")
-	os.WriteFile(stateFile, data, 0644)
+// saveState writes state to stateFile as indented JSON.
+func saveState(state State) error {
+	data, err := json.MarshalIndent(state, "", "  ")
+	if err != nil {
+		return err
+	}
+
+	return os.WriteFile(stateFile, data, 0o644)
 }

@@ -4,39 +4,53 @@ import (
 	"fmt"
 	"net/http"
 	"strings"
-	"time"
 )
 
-// ntfyBaseURL is overridden in tests to point at a mock server.
+// ntfyBaseURL is the ntfy.sh server. Tests point it at a local server.
 var ntfyBaseURL = "https://ntfy.sh"
 
-// SendNotification posts msg to a ntfy.sh topic with optional headers
-// (e.g. Title, Priority, Tags). It's a no-op if topic is empty.
-func SendNotification(topic, msg string, headers map[string]string) {
-	if topic == "" {
-		fmt.Println("NTFY_TOPIC not configured. Skipping notification.")
-		return
-	}
+// notification is one ntfy.sh message. Each field except Message goes into
+// the ntfy.sh header of the same name. Empty fields are not sent.
+type notification struct {
+	Title    string
+	Message  string
+	Priority string
+	Tags     string
+	Actions  string
+}
 
-	req, err := http.NewRequest("POST", ntfyBaseURL+"/"+topic, strings.NewReader(msg))
+// send posts n to the ntfy.sh topic. It returns an error if the request
+// fails or ntfy.sh does not accept the message.
+func (n notification) send(topic string) error {
+	// Step 1: Make the request. The message is the body.
+	req, err := http.NewRequest(http.MethodPost, ntfyBaseURL+"/"+topic, strings.NewReader(n.Message))
 	if err != nil {
-		fmt.Println("Error creating request:", err)
-		return
+		return err
 	}
 
-	for k, v := range headers {
-		req.Header.Set(k, v)
+	// Step 1.1: Add the ntfy.sh headers that have a value.
+	for name, value := range map[string]string{
+		"Title":    n.Title,
+		"Priority": n.Priority,
+		"Tags":     n.Tags,
+		"Actions":  n.Actions,
+	} {
+		if value != "" {
+			req.Header.Set(name, value)
+		}
 	}
 
-	client := &http.Client{Timeout: 15 * time.Second}
-	resp, err := client.Do(req)
+	// Step 2: Send the request.
+	resp, err := httpClient.Do(req)
 	if err != nil {
-		fmt.Println("Error sending notification:", err)
-		return
+		return err
 	}
 	defer resp.Body.Close()
 
-	if resp.StatusCode >= 400 {
-		fmt.Printf("ntfy.sh returned status %d\n", resp.StatusCode)
+	// Step 3: Make sure that ntfy.sh accepted the message.
+	if resp.StatusCode != http.StatusOK {
+		return fmt.Errorf("ntfy.sh returned status %d", resp.StatusCode)
 	}
+
+	return nil
 }

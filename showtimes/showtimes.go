@@ -1,73 +1,80 @@
+// Package showtimes checks a VOX Cinemas movie page for showtimes and sends
+// ntfy.sh notifications when the result changes.
 package showtimes
 
 import (
 	"fmt"
+	"net/http"
+	"os"
 	"time"
 )
 
-// NotFoundInterval is how often a "still not found" notification is resent
-// while no showtimes are available.
+// NotFoundInterval is the minimum time between two "still no showtimes"
+// notifications.
 const NotFoundInterval = 2 * time.Hour
 
-// notification is a single message to send via SendNotification.
-type notification struct {
-	Message string
-	Headers map[string]string
+// httpClient is the client for the VOX page and for ntfy.sh.
+var httpClient = &http.Client{Timeout: 15 * time.Second}
+
+// Check runs one check of the VOX movie page at pageURL and sends a
+// notification to the ntfy.sh topic when necessary. If the check fails,
+// Check returns an error and keeps the old state.
+func Check(pageURL, topic string) error {
+	// Step 1: Load the state of the last run.
+	state := loadState()
+
+	// Step 2: Check the page for sessions.
+	found, err := hasSessions(pageURL)
+	if err != nil {
+		return fmt.Errorf("checking %s: %w", pageURL, err)
+	}
+
+	// Step 3: Get the new state and the notification to send.
+	state, n := decide(state, found, time.Now(), pageURL)
+
+	// Step 4: Send the notification, if there is one.
+	if n != nil {
+		if err := n.send(topic); err != nil {
+			fmt.Fprintln(os.Stderr, "error: sending notification:", err)
+		}
+	}
+
+	// Step 5: Save the new state for the next run.
+	return saveState(state)
 }
 
-// decideNotification is the pure decision logic behind
-// CheckShowtimeAvailability: given the previous state, whether showtimes
-// were found just now, and the current time, it returns the updated state
-// and the notification to send (nil if none).
-func decideNotification(state State, found bool, now time.Time, pageURL string) (State, *notification) {
+// decide returns the new state after a check, and the notification to send.
+// The notification is nil when there is nothing new to tell.
+func decide(state State, found bool, now time.Time, pageURL string) (State, *notification) {
+	// Step 1: Showtimes are available.
 	if found {
-		var notify *notification
-		if state.Status != "found" {
-			notify = &notification{
-				Message: fmt.Sprintf("🎬 Showtimes just appeared on %s", pageURL),
-				Headers: map[string]string{
-					"Title":    "Showtimes Available 🎉",
-					"Priority": "5",
-					"Tags":     "popcorn, clapper, vox-cinemas",
-					"Actions":  fmt.Sprintf("view, Book now, %s", pageURL),
-				},
+		// Step 1.1: Notify only when the status changes to "found".
+		var n *notification
+		if state.Status != statusFound {
+			n = &notification{
+				Title:    "Showtimes available",
+				Message:  "Showtimes just appeared on " + pageURL,
+				Priority: "5",
+				Tags:     "popcorn,clapper,vox-cinemas",
+				Actions:  "view, Book now, " + pageURL,
 			}
 		}
-		state.Status = "found"
-		return state, notify
+		state.Status = statusFound
+		return state, n
 	}
 
-	var notify *notification
-	if now.Sub(state.LastNotFoundTs) >= NotFoundInterval {
-		notify = &notification{
-			Message: fmt.Sprintf("❌ Still no showtimes on %s", pageURL),
-			Headers: map[string]string{
-				"Title":    "No Showtimes yet",
-				"Priority": "1",
-			},
-		}
-		state.LastNotFoundTs = now
+	// Step 2: No showtimes.
+	state.Status = statusNotFound
+
+	// Step 2.1: Notify at most once in each NotFoundInterval.
+	if now.Sub(state.LastNotFoundTs) < NotFoundInterval {
+		return state, nil
 	}
-	state.Status = "not-found"
-	return state, notify
-}
+	state.LastNotFoundTs = now
 
-// CheckShowtimeAvailability checks pageURL for showtimes and notifies
-// topic on ntfy.sh when availability changes. It returns an error if the
-// page check fails; the state is then left unchanged.
-func CheckShowtimeAvailability(pageURL, topic string) error {
-	state := LoadState()
-
-	found, err := hasShowtimesAvailable(pageURL)
-	if err != nil {
-		return fmt.Errorf("checking showtime availability: %w", err)
+	return state, &notification{
+		Title:    "No showtimes yet",
+		Message:  "Still no showtimes on " + pageURL,
+		Priority: "1",
 	}
-
-	state, notify := decideNotification(state, found, time.Now(), pageURL)
-	if notify != nil {
-		SendNotification(topic, notify.Message, notify.Headers)
-	}
-
-	SaveState(state)
-	return nil
 }

@@ -1,3 +1,8 @@
+// Command vox-showtime-check checks a VOX Cinemas movie page one time and
+// sends an ntfy.sh notification when showtimes appear.
+//
+// It reads SHOWTIMES_URL and NTFY_TOPIC from the environment or from a .env
+// file. It exits with code 1 if a value is missing or the check fails.
 package main
 
 import (
@@ -8,21 +13,19 @@ import (
 	_ "github.com/joho/godotenv/autoload"
 )
 
-// Monitors a webpage for showtime availability and sends notifications via ntfy.sh.
-//
-// It loads the last known state, checks the configured URL for showtime listings,
-// sends notifications on changes or periodic "no showtimes" updates, and persists the updated state.
+// main reads the configuration and runs one check.
 func main() {
-	// Step 1: Read configuration from environment variables
-	url := os.Getenv("SHOWTIMES_URL")
+	// Step 1: Read the configuration.
+	pageURL := os.Getenv("SHOWTIMES_URL")
 	topic := os.Getenv("NTFY_TOPIC")
-	if url == "" || topic == "" {
-		fmt.Println("❌ Missing SHOWTIMES_URL or NTFY_TOPIC env vars.")
+	if pageURL == "" || topic == "" {
+		fmt.Fprintln(os.Stderr, "error: set SHOWTIMES_URL and NTFY_TOPIC")
 		os.Exit(1)
 	}
 
-	if err := showtimes.CheckShowtimeAvailability(url, topic); err != nil {
-		fmt.Println("Error:", err)
+	// Step 2: Run one check.
+	if err := showtimes.Check(pageURL, topic); err != nil {
+		fmt.Fprintln(os.Stderr, "error:", err)
 		os.Exit(1)
 	}
 }

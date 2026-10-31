@@ -7,60 +7,51 @@ import (
 	"testing"
 )
 
-func TestSendNotificationPostsExpectedRequest(t *testing.T) {
-	var gotMethod, gotPath, gotBody string
-	var gotHeaders http.Header
+// ntfyRequest is one request that the fake ntfy.sh server received.
+type ntfyRequest struct {
+	Method, Path, Body string
+	Header             http.Header
+}
 
-	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		gotMethod = r.Method
-		gotPath = r.URL.Path
-		gotHeaders = r.Header
+// fakeNtfy points ntfyBaseURL at a local server that replies with status
+// and records each request. The original URL comes back after the test.
+func fakeNtfy(t *testing.T, status int) *[]ntfyRequest {
+	t.Helper()
+
+	var got []ntfyRequest
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		body, _ := io.ReadAll(r.Body)
-		gotBody = string(body)
-		w.WriteHeader(http.StatusOK)
+		got = append(got, ntfyRequest{r.Method, r.URL.Path, string(body), r.Header})
+		w.WriteHeader(status)
 	}))
-	defer server.Close()
+	t.Cleanup(srv.Close)
 
-	restore := setNtfyBaseURL(server.URL)
-	defer restore()
-
-	SendNotification("mytopic", "hello world", map[string]string{"Title": "Test"})
-
-	if gotMethod != http.MethodPost {
-		t.Errorf("Method = %q, want %q", gotMethod, http.MethodPost)
-	}
-	if gotPath != "/mytopic" {
-		t.Errorf("Path = %q, want %q", gotPath, "/mytopic")
-	}
-	if gotBody != "hello world" {
-		t.Errorf("Body = %q, want %q", gotBody, "hello world")
-	}
-	if got := gotHeaders.Get("Title"); got != "Test" {
-		t.Errorf("Title header = %q, want %q", got, "Test")
-	}
-}
-
-func TestSendNotificationSkipsWhenTopicEmpty(t *testing.T) {
-	called := false
-	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		called = true
-	}))
-	defer server.Close()
-
-	restore := setNtfyBaseURL(server.URL)
-	defer restore()
-
-	SendNotification("", "hello world", nil)
-
-	if called {
-		t.Error("expected no request to be made when topic is empty")
-	}
-}
-
-// setNtfyBaseURL overrides ntfyBaseURL for the duration of a test and
-// returns a func to restore it.
-func setNtfyBaseURL(url string) func() {
 	original := ntfyBaseURL
-	ntfyBaseURL = url
-	return func() { ntfyBaseURL = original }
+	ntfyBaseURL = srv.URL
+	t.Cleanup(func() { ntfyBaseURL = original })
+
+	return &got
+}
+
+func TestNotificationSend(t *testing.T) {
+	got := fakeNtfy(t, http.StatusOK)
+
+	n := notification{Title: "Title text", Message: "Body text", Priority: "5"}
+	if err := n.send("mytopic"); err != nil {
+		t.Fatalf("send: %v", err)
+	}
+
+	if len(*got) != 1 {
+		t.Fatalf("got %d requests, want 1", len(*got))
+	}
+	req := (*got)[0]
+	if req.Method != http.MethodPost || req.Path != "/mytopic" || req.Body != "Body text" {
+		t.Errorf("request = %s %s %q, want POST /mytopic %q", req.Method, req.Path, req.Body, "Body text")
+	}
+	if req.Header.Get("Title") != "Title text" || req.Header.Get("Priority") != "5" {
+		t.Errorf("Title, Priority = %q, %q", req.Header.Get("Title"), req.Header.Get("Priority"))
+	}
+	if _, ok := req.Header["Tags"]; ok {
+		t.Error("empty Tags field was sent as a header")
+	}
 }

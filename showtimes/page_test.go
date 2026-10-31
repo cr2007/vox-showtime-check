@@ -25,11 +25,13 @@ const comingSoonPage = `<html><body>
 <a href="/movies/comingsoon">Coming Soon</a>
 </body></html>`
 
-// nextJSShell is the client-rendered page layout VOX used before.
+// nextJSShell is the client-rendered layout that VOX used before.
 const nextJSShell = `<html><head>
 <script src="/_next/static/chunks/main-abc123.js"></script>
 </head><body><div id="__next"></div></body></html>`
 
+// servePage starts a local server that replies to each request with status
+// and body. It returns the URL of a movie page on that server.
 func servePage(t *testing.T, status int, body string) string {
 	t.Helper()
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -40,7 +42,7 @@ func servePage(t *testing.T, status int, body string) string {
 	return srv.URL + "/movies/some-movie"
 }
 
-func TestHasShowtimesAvailable(t *testing.T) {
+func TestHasSessions(t *testing.T) {
 	tests := []struct {
 		name      string
 		status    int
@@ -48,15 +50,15 @@ func TestHasShowtimesAvailable(t *testing.T) {
 		want      bool
 		wantErrIn string
 	}{
-		{name: "page with sessions", status: 200, body: showingPage, want: true},
-		{name: "coming soon page", status: 200, body: comingSoonPage, want: false},
-		{name: "unknown movie", status: 404, body: "not found", wantErrIn: "status 404"},
-		{name: "client-rendered layout", status: 200, body: nextJSShell, wantErrIn: "client-rendered"},
+		{name: "page with sessions", status: http.StatusOK, body: showingPage, want: true},
+		{name: "coming soon page", status: http.StatusOK, body: comingSoonPage, want: false},
+		{name: "unknown movie", status: http.StatusNotFound, body: "not found", wantErrIn: "status 404"},
+		{name: "client-rendered layout", status: http.StatusOK, body: nextJSShell, wantErrIn: "client-rendered"},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			got, err := hasShowtimesAvailable(servePage(t, tt.status, tt.body))
+			got, err := hasSessions(servePage(t, tt.status, tt.body))
 
 			if tt.wantErrIn != "" {
 				if err == nil || !strings.Contains(err.Error(), tt.wantErrIn) {

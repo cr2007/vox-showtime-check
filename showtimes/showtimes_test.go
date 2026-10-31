@@ -1,107 +1,106 @@
 package showtimes
 
 import (
+	"net/http"
+	"os"
 	"testing"
 	"time"
 )
 
-func TestDecideNotification(t *testing.T) {
+func TestDecide(t *testing.T) {
 	const pageURL = "https://uae.voxcinemas.com/movies/backrooms"
 	now := time.Date(2026, 6, 16, 12, 0, 0, 0, time.UTC)
 
 	tests := []struct {
-		name       string
-		state      State
-		found      bool
-		wantNotify bool
-		wantStatus string
-		wantTs     time.Time
+		name      string
+		state     State
+		found     bool
+		wantTitle string // "" means no notification
+		want      State
 	}{
 		{
-			name:       "transition to found notifies",
-			state:      State{Status: "not-found", LastNotFoundTs: epoch},
-			found:      true,
-			wantNotify: true,
-			wantStatus: "found",
-			wantTs:     epoch,
+			name:      "showtimes appear",
+			state:     State{Status: statusNotFound},
+			found:     true,
+			wantTitle: "Showtimes available",
+			want:      State{Status: statusFound},
 		},
 		{
-			name:       "still found does not re-notify",
-			state:      State{Status: "found", LastNotFoundTs: epoch},
-			found:      true,
-			wantNotify: false,
-			wantStatus: "found",
-			wantTs:     epoch,
+			name:  "showtimes still there",
+			state: State{Status: statusFound},
+			found: true,
+			want:  State{Status: statusFound},
 		},
 		{
-			name:       "not found, interval elapsed notifies",
-			state:      State{Status: "found", LastNotFoundTs: now.Add(-NotFoundInterval)},
-			found:      false,
-			wantNotify: true,
-			wantStatus: "not-found",
-			wantTs:     now,
+			name:      "first check, no showtimes",
+			state:     State{Status: statusNotFound},
+			wantTitle: "No showtimes yet",
+			want:      State{Status: statusNotFound, LastNotFoundTs: now},
 		},
 		{
-			name:       "not found, interval not yet elapsed stays quiet",
-			state:      State{Status: "not-found", LastNotFoundTs: now.Add(-time.Minute)},
-			found:      false,
-			wantNotify: false,
-			wantStatus: "not-found",
-			wantTs:     now.Add(-time.Minute),
+			name:      "showtimes gone, interval passed",
+			state:     State{Status: statusFound, LastNotFoundTs: now.Add(-NotFoundInterval)},
+			wantTitle: "No showtimes yet",
+			want:      State{Status: statusNotFound, LastNotFoundTs: now},
 		},
 		{
-			name:       "first ever not-found check notifies immediately",
-			state:      State{Status: "not-found", LastNotFoundTs: epoch},
-			found:      false,
-			wantNotify: true,
-			wantStatus: "not-found",
-			wantTs:     now,
+			name:  "no showtimes, interval not passed",
+			state: State{Status: statusNotFound, LastNotFoundTs: now.Add(-time.Minute)},
+			want:  State{Status: statusNotFound, LastNotFoundTs: now.Add(-time.Minute)},
 		},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			newState, notify := decideNotification(tt.state, tt.found, now, pageURL)
+			got, n := decide(tt.state, tt.found, now, pageURL)
 
-			if (notify != nil) != tt.wantNotify {
-				t.Errorf("notify = %v, want notify present = %v", notify, tt.wantNotify)
+			gotTitle := ""
+			if n != nil {
+				gotTitle = n.Title
 			}
-			if newState.Status != tt.wantStatus {
-				t.Errorf("Status = %q, want %q", newState.Status, tt.wantStatus)
+			if gotTitle != tt.wantTitle {
+				t.Errorf("notification title = %q, want %q", gotTitle, tt.wantTitle)
 			}
-			if !newState.LastNotFoundTs.Equal(tt.wantTs) {
-				t.Errorf("LastNotFoundTs = %v, want %v", newState.LastNotFoundTs, tt.wantTs)
+			if got.Status != tt.want.Status || !got.LastNotFoundTs.Equal(tt.want.LastNotFoundTs) {
+				t.Errorf("state = %+v, want %+v", got, tt.want)
 			}
 		})
 	}
 }
 
-func TestDecideNotificationMessageContent(t *testing.T) {
-	now := time.Now()
-	pageURL := "https://uae.voxcinemas.com/movies/backrooms"
+// Regression: a second run must not send the "available" notification again.
+func TestCheckNotifiesOnceWhenShowtimesAppear(t *testing.T) {
+	t.Chdir(t.TempDir())
+	sent := fakeNtfy(t, http.StatusOK)
+	pageURL := servePage(t, http.StatusOK, showingPage)
 
-	_, notify := decideNotification(State{Status: "not-found", LastNotFoundTs: epoch}, true, now, pageURL)
-	if notify == nil {
-		t.Fatal("expected a notification")
-	}
-	if notify.Headers["Title"] != "Showtimes Available 🎉" {
-		t.Errorf("Title = %q", notify.Headers["Title"])
+	for run := 1; run <= 2; run++ {
+		if err := Check(pageURL, "topic"); err != nil {
+			t.Fatalf("run %d: %v", run, err)
+		}
 	}
 
-	_, notify = decideNotification(State{Status: "found", LastNotFoundTs: epoch}, false, now, pageURL)
-	if notify == nil {
-		t.Fatal("expected a notification")
+	if len(*sent) != 1 {
+		t.Fatalf("sent %d notifications, want 1", len(*sent))
 	}
-	if notify.Headers["Title"] != "No Showtimes yet" {
-		t.Errorf("Title = %q", notify.Headers["Title"])
+	if got := loadState().Status; got != statusFound {
+		t.Errorf("saved status = %q, want %q", got, statusFound)
 	}
 }
 
-func TestCheckShowtimeAvailabilityReturnsCheckError(t *testing.T) {
+// Regression: a failed page check must fail the run (exit code 1 in main)
+// and must not change the state.
+func TestCheckPageErrorKeepsState(t *testing.T) {
 	t.Chdir(t.TempDir())
+	sent := fakeNtfy(t, http.StatusOK)
 
-	err := CheckShowtimeAvailability(servePage(t, 404, "not found"), "")
-	if err == nil {
-		t.Fatal("expected an error for a failed page check, got none")
+	if err := Check(servePage(t, http.StatusNotFound, "not found"), "topic"); err == nil {
+		t.Fatal("Check returned no error for a 404 page")
+	}
+	if len(*sent) != 0 {
+		t.Errorf("sent %d notifications, want 0", len(*sent))
+	}
+	if _, err := os.Stat(stateFile); !os.IsNotExist(err) {
+		t.Errorf("state file was written after a failed check (stat err = %v)", err)
 	}
 }
