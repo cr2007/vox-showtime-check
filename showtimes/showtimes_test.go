@@ -104,3 +104,23 @@ func TestCheckPageErrorKeepsState(t *testing.T) {
 		t.Errorf("state file was written after a failed check (stat err = %v)", err)
 	}
 }
+
+// Regression: if ntfy.sh fails, the state must not change to "found", so the
+// next run sends the notification again.
+func TestCheckNotificationErrorRetriesNextRun(t *testing.T) {
+	t.Chdir(t.TempDir())
+	pageURL := servePage(t, http.StatusOK, showingPage)
+
+	fakeNtfy(t, http.StatusInternalServerError)
+	if err := Check(pageURL, "topic"); err == nil {
+		t.Fatal("Check returned no error when ntfy.sh failed")
+	}
+
+	sent := fakeNtfy(t, http.StatusOK)
+	if err := Check(pageURL, "topic"); err != nil {
+		t.Fatalf("second run: %v", err)
+	}
+	if len(*sent) != 1 {
+		t.Errorf("second run sent %d notifications, want 1", len(*sent))
+	}
+}

@@ -5,7 +5,6 @@ package showtimes
 import (
 	"fmt"
 	"net/http"
-	"os"
 	"time"
 )
 
@@ -17,8 +16,9 @@ const NotFoundInterval = 2 * time.Hour
 var httpClient = &http.Client{Timeout: 15 * time.Second}
 
 // Check runs one check of the VOX movie page at pageURL and sends a
-// notification to the ntfy.sh topic when necessary. If the check fails,
-// Check returns an error and keeps the old state.
+// notification to the ntfy.sh topic when necessary. If the check or the
+// notification fails, Check returns an error and keeps the old state, so
+// the next run tries again.
 func Check(pageURL, topic string) error {
 	// Step 1: Load the state of the last run.
 	state := loadState()
@@ -35,7 +35,7 @@ func Check(pageURL, topic string) error {
 	// Step 4: Send the notification, if there is one.
 	if n != nil {
 		if err := n.send(topic); err != nil {
-			fmt.Fprintln(os.Stderr, "error: sending notification:", err)
+			return fmt.Errorf("sending notification: %w", err)
 		}
 	}
 
