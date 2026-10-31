@@ -24,12 +24,14 @@ jobs:
         with:
           go-version: '1.25'
 
+      # The key never exists, so the restore falls back to the prefix and
+      # loads the most recent state saved by the step below.
       - name: Restore cached state
         id: cache-json
-        uses: actions/cache@v5
+        uses: actions/cache/restore@v5
         with:
           path: state.json
-          key: showtimes-state-main
+          key: showtimes-state-${{ github.run_id }}
           restore-keys: |
             showtimes-state-
 
