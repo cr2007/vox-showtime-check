@@ -2,7 +2,9 @@ name: Check Showtimes
 
 on:
   schedule:
-    - cron: "0 * * * *"   # Every hour on the hour (UTC)
+    # Four times each hour, off the full hour. GitHub starts runs at the full
+    # hour late or skips them under load.
+    - cron: "7,22,37,52 * * * *"
   push:
     branches:
       - master
