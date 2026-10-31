@@ -55,11 +55,13 @@ go build -o vox-showtime-check main.go
 
 # GitHub Actions Automation
 This project includes a GitHub Actions workflow (`.github/workflows/check-showtimes.yml`) to run the check automatically:
-- **Scheduled**: Runs every hour (on the hour, UTC)
+- **Scheduled**: Runs four times each hour, at minutes 7, 22, 37 and 52 (UTC)
 - **On Push**: Runs when changes are pushed to the `master` branch
 - **Manual**: Can be triggered via the Actions tab
 
-The workflow uses [actions/cache](https://github.com/actions/cache) to persist the `state.json` file between runs, ensuring notification state is maintained.
+The workflow uses [actions/cache](https://github.com/actions/cache) to persist the `state.json` file between runs, ensuring notification state is maintained. If a run fails, it sends one "Showtime check failed" alert to your ntfy.sh topic.
+
+See [docs/github-actions.md](./docs/github-actions.md) for the schedule, the state cache, and the failure alerts.
 
 ### Required GitHub Actions Variables
 Set the following repository variables in your GitHub repo settings:
