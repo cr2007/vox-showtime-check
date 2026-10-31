@@ -57,7 +57,7 @@ func decideNotification(state State, found bool, now time.Time, pageURL string) 
 func CheckShowtimeAvailability(pageURL, topic string) {
 	state := LoadState()
 
-	found, err := hasShowtimesAvailable(pageURL, &state)
+	found, err := hasShowtimesAvailable(pageURL)
 	if err != nil {
 		fmt.Println("Error checking showtime availability:", err)
 		return

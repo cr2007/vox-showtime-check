@@ -42,9 +42,8 @@ func TestSaveAndLoadStateRoundTrip(t *testing.T) {
 	t.Chdir(t.TempDir())
 
 	want := State{
-		Status:            "found",
-		LastNotFoundTs:    time.Date(2026, 1, 2, 3, 4, 5, 0, time.UTC),
-		CachedAPIKeyChunk: "/_next/static/chunks/abc.js",
+		Status:         "found",
+		LastNotFoundTs: time.Date(2026, 1, 2, 3, 4, 5, 0, time.UTC),
 	}
 	SaveState(want)
 
@@ -55,8 +54,5 @@ func TestSaveAndLoadStateRoundTrip(t *testing.T) {
 	}
 	if !got.LastNotFoundTs.Equal(want.LastNotFoundTs) {
 		t.Errorf("LastNotFoundTs = %v, want %v", got.LastNotFoundTs, want.LastNotFoundTs)
-	}
-	if got.CachedAPIKeyChunk != want.CachedAPIKeyChunk {
-		t.Errorf("CachedAPIKeyChunk = %q, want %q", got.CachedAPIKeyChunk, want.CachedAPIKeyChunk)
 	}
 }

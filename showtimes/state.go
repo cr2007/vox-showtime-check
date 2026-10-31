@@ -6,12 +6,11 @@ import (
 	"time"
 )
 
-// State tracks whether showtimes were last seen, when the last "not found"
-// notification was sent, and which JS chunk last yielded the VOX API key.
+// State tracks whether showtimes were last seen and when the last "not found"
+// notification was sent.
 type State struct {
-	Status            string    `json:"status"` // "found" or "not-found"
-	LastNotFoundTs    time.Time `json:"last_not_found_ts"`
-	CachedAPIKeyChunk string    `json:"cached_api_key_chunk,omitempty"`
+	Status         string    `json:"status"` // "found" or "not-found"
+	LastNotFoundTs time.Time `json:"last_not_found_ts"`
 }
 
 const stateFile = "state.json"
