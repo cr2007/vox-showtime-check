@@ -96,3 +96,12 @@ func TestDecideNotificationMessageContent(t *testing.T) {
 		t.Errorf("Title = %q", notify.Headers["Title"])
 	}
 }
+
+func TestCheckShowtimeAvailabilityReturnsCheckError(t *testing.T) {
+	t.Chdir(t.TempDir())
+
+	err := CheckShowtimeAvailability(servePage(t, 404, "not found"), "")
+	if err == nil {
+		t.Fatal("expected an error for a failed page check, got none")
+	}
+}

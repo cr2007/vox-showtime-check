@@ -21,5 +21,8 @@ func main() {
 		os.Exit(1)
 	}
 
-	showtimes.CheckShowtimeAvailability(url, topic)
+	if err := showtimes.CheckShowtimeAvailability(url, topic); err != nil {
+		fmt.Println("Error:", err)
+		os.Exit(1)
+	}
 }

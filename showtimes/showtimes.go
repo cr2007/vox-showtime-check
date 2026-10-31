@@ -53,14 +53,14 @@ func decideNotification(state State, found bool, now time.Time, pageURL string) 
 }
 
 // CheckShowtimeAvailability checks pageURL for showtimes and notifies
-// topic on ntfy.sh when availability changes.
-func CheckShowtimeAvailability(pageURL, topic string) {
+// topic on ntfy.sh when availability changes. It returns an error if the
+// page check fails; the state is then left unchanged.
+func CheckShowtimeAvailability(pageURL, topic string) error {
 	state := LoadState()
 
 	found, err := hasShowtimesAvailable(pageURL)
 	if err != nil {
-		fmt.Println("Error checking showtime availability:", err)
-		return
+		return fmt.Errorf("checking showtime availability: %w", err)
 	}
 
 	state, notify := decideNotification(state, found, time.Now(), pageURL)
@@ -69,4 +69,5 @@ func CheckShowtimeAvailability(pageURL, topic string) {
 	}
 
 	SaveState(state)
+	return nil
 }
